@@ -15,6 +15,7 @@ import {
   updateParticles,
   updatePickups,
   resolveCollisions,
+  triggerNova,
 } from './entities.js';
 import { WaveDirector } from './waves.js';
 import {
@@ -74,6 +75,7 @@ const game = {
   pickups: [],
   floaters: [],
   powerups: { spread: 0, rapid: 0, shield: 0 },
+  nova: 0,
   shake: 0,
   flash: 0,
   accuracy: 0,
@@ -127,6 +129,7 @@ function resetRun() {
   game.pickups = [];
   game.floaters = [];
   game.powerups = { spread: 0, rapid: 0, shield: 0 };
+  game.nova = 0;
   game.score = 0;
   game.combo = 0;
   game.comboTimer = 0;
@@ -196,6 +199,7 @@ function handleMenuInput() {
   } else if (game.state === 'playing') {
     if (input.wasPressed('KeyP', 'Escape')) { game.state = 'paused'; return; }
     if (input.wasPressed('KeyR')) { startGame(); return; }
+    if (input.wasPressed('KeyB')) { triggerNova(game); return; }
   } else if (game.state === 'paused') {
     if (input.wasPressed('KeyP', 'Escape')) { game.state = 'playing'; return; }
     if (input.mouseClicked && menuButtonAt(game) === 'pauseButton') { game.state = 'playing'; return; }

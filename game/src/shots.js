@@ -57,22 +57,67 @@ export function applyShotScene(game, params) {
 
   if (shot === 'play') {
     game.state = 'playing';
-    game.director.startWave(2);
-    game.score = 2450;
-    game.combo = 4;
+    game.director.startWave(4);
+    game.score = 5200;
+    game.combo = 5;
     game.comboTimer = 2.0;
-    game.kills = 17;
-    // Pre-seed a lively fight, then let the autopilot run it forward.
+    game.kills = 34;
+    // Spread + rapid already running and a nova charged, so the frame
+    // shows the full kit: three bullet streams and the NOVA READY tag.
+    game.powerups.spread = 12;
+    game.powerups.rapid = 10;
+    game.nova = 1;
+    // Pre-seed a dense, varied fight, then let the autopilot run it
+    // forward just long enough to fill the frame — not long enough to
+    // clear it. Twelve enemies across six kinds, wave 4's queue still
+    // trickling in behind them.
     const rng = game.rng;
-    for (let i = 0; i < 6; i++) {
+    const kinds = ['thorn', 'thorn', 'spitter', 'splitter', 'orbiter', 'stinger'];
+    for (let i = 0; i < 12; i++) {
       const at = rng.edgePoint(60, CONFIG.W, CONFIG.H);
-      const type = ['thorn', 'thorn', 'spitter', 'splitter', 'orbiter'][i % 5];
-      game.enemies.push(createEnemy(type, at.x, at.y, 2, rng));
+      game.enemies.push(createEnemy(kinds[i % kinds.length], at.x, at.y, 4, rng));
     }
     game.pickups.push(createPickup('spread', 760, 300));
     game.pickups.push(createPickup('petal', 420, 520));
     game.pickups.push(createPickup('petal', 880, 560));
-    const steps = 60 * 6;
+    const steps = 60 * 2.5;
+    for (let i = 0; i < steps; i++) {
+      autopilot(game);
+      game.step(1 / 60);
+    }
+    game.input.mouse.down = false;
+    return { freeze };
+  }
+
+  if (shot === 'boss') {
+    // The peak moment: the Thornheart on wave 6, escorts around it,
+    // its radial burst in flight, the boss bar on the HUD.
+    game.state = 'playing';
+    game.wave = 6;
+    game.score = 9800;
+    game.combo = 6;
+    game.comboTimer = 2.0;
+    game.kills = 58;
+    game.lives = 2;
+    game.powerups.spread = 12;
+    game.nova = 1;
+    const rng = game.rng;
+    const boss = createEnemy('boss', 860, 300, 6, rng);
+    boss.hp = Math.floor(boss.maxHp * 0.85);
+    boss.burstTimer = 0.05;
+    game.enemies.push(boss);
+    game.boss = boss;
+    const escorts = [
+      ['thorn', 640, 180], ['thorn', 700, 470], ['thorn', 1020, 480],
+      ['spitter', 1120, 220], ['stinger', 980, 620],
+    ];
+    for (const [type, x, y] of escorts) {
+      game.enemies.push(createEnemy(type, x, y, 6, rng));
+    }
+    game.pickups.push(createPickup('heart', 420, 560));
+    // A short autopilot run: the boss fires its radial burst, the ship
+    // answers with a spread stream, orbs fill the air.
+    const steps = 60 * 1.5;
     for (let i = 0; i < steps; i++) {
       autopilot(game);
       game.step(1 / 60);

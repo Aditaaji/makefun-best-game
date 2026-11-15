@@ -136,6 +136,8 @@ export function drawEnemies(ctx, game) {
       drawSplitter(ctx, e, flash);
     } else if (e.type === 'orbiter') {
       drawOrbiter(ctx, e, flash);
+    } else if (e.type === 'stinger') {
+      drawStinger(ctx, e, game, flash);
     } else if (e.type === 'boss') {
       drawBoss(ctx, e, game, flash);
     }
@@ -217,6 +219,31 @@ function drawOrbiter(ctx, e, flash) {
     ctx.lineTo(Math.cos(a2) * e.radius * 0.45, Math.sin(a2) * e.radius * 0.45);
   }
   ctx.closePath();
+  ctx.fill();
+}
+
+function drawStinger(ctx, e, game, flash) {
+  // A slim dart. While telegraphing it flashes white with a warning
+  // ring, so the lunge is always readable before it fires.
+  if (e.dashState === 'tele') {
+    ctx.strokeStyle = 'rgba(244, 114, 182, 0.7)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, e.radius + 12 + Math.sin(game.time * 20) * 3, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.rotate(Math.atan2(e.vy, e.vx));
+  ctx.fillStyle = flash ? '#ffffff' : e.color;
+  ctx.beginPath();
+  ctx.moveTo(e.radius + 8, 0);
+  ctx.lineTo(-e.radius * 0.7, e.radius * 0.75);
+  ctx.lineTo(-e.radius * 0.3, 0);
+  ctx.lineTo(-e.radius * 0.7, -e.radius * 0.75);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#2b0213';
+  ctx.beginPath();
+  ctx.arc(0, 0, 4, 0, Math.PI * 2);
   ctx.fill();
 }
 

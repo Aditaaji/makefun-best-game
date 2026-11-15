@@ -90,6 +90,13 @@ export function drawHUD(ctx, game) {
     ctx.fillStyle = '#c77dff';
     ctx.fillText(act.join('   '), CONFIG.W - 22, CONFIG.H - 34);
   }
+  // Stored nova charge, bottom right above the power-ups.
+  if (game.nova > 0) {
+    ctx.textAlign = 'right';
+    ctx.font = 'bold 16px system-ui, sans-serif';
+    ctx.fillStyle = '#fb7185';
+    ctx.fillText('✺ NOVA READY — press B', CONFIG.W - 22, CONFIG.H - 58);
+  }
   // Wave banner.
   if (game.director.banner > 0) {
     ctx.globalAlpha = Math.min(1, game.director.banner);
@@ -125,12 +132,13 @@ export function drawTitle(ctx, game) {
   ctx.textBaseline = 'middle';
   centerText(ctx, 'VOIDBLOOM', CONFIG.W / 2, 210, 'bold 84px system-ui, sans-serif', '#22d3ee');
   centerText(ctx, 'Reignite the garden. Survive all 10 waves.', CONFIG.W / 2, 272, '22px system-ui, sans-serif', CONFIG.COLORS.text);
-  panel(ctx, CONFIG.W / 2 - 330, 320, 660, 190);
-  centerText(ctx, 'MOVE  —  WASD or Arrow keys', CONFIG.W / 2, 352, '18px system-ui, sans-serif', CONFIG.COLORS.text);
-  centerText(ctx, 'AIM + FIRE  —  Mouse, hold click or Space', CONFIG.W / 2, 384, '18px system-ui, sans-serif', CONFIG.COLORS.text);
-  centerText(ctx, 'PAUSE  —  P      MUTE  —  M      RESTART  —  R', CONFIG.W / 2, 416, '18px system-ui, sans-serif', CONFIG.COLORS.text);
-  centerText(ctx, 'Chain kills for combos. Grab petals, spread shot, rapid fire, shields.', CONFIG.W / 2, 452, '16px system-ui, sans-serif', CONFIG.COLORS.dimText);
-  centerText(ctx, 'Beware the Thornheart on waves 3, 6 and 10.', CONFIG.W / 2, 480, '16px system-ui, sans-serif', '#fb7185');
+  panel(ctx, CONFIG.W / 2 - 330, 320, 660, 210);
+  centerText(ctx, 'MOVE  —  WASD or Arrow keys', CONFIG.W / 2, 350, '18px system-ui, sans-serif', CONFIG.COLORS.text);
+  centerText(ctx, 'AIM + FIRE  —  Mouse, hold click or Space', CONFIG.W / 2, 382, '18px system-ui, sans-serif', CONFIG.COLORS.text);
+  centerText(ctx, 'PAUSE  —  P      MUTE  —  M      RESTART  —  R', CONFIG.W / 2, 414, '18px system-ui, sans-serif', CONFIG.COLORS.text);
+  centerText(ctx, 'Chain kills for combos. Grab petals, spread shot, rapid fire, shields.', CONFIG.W / 2, 446, '16px system-ui, sans-serif', CONFIG.COLORS.dimText);
+  centerText(ctx, 'Beware the Thornheart on waves 3, 6 and 10.', CONFIG.W / 2, 476, '16px system-ui, sans-serif', '#fb7185');
+  centerText(ctx, 'Grab the ✺ nova and press B to detonate it when the swarm closes in.', CONFIG.W / 2, 506, '16px system-ui, sans-serif', '#fb7185');
   const b = button(ctx, CONFIG.W / 2 - 130, 560, 260, 56, '▶  START', game);
   game.titleButton = b;
   if (game.best > 0) {

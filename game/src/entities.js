@@ -53,12 +53,26 @@ export function createEnemy(type, x, y, wave, rng) {
     fireTimer: rng.range(1.2, 2.4),
     spawnTimer: rng.range(4, 6),
     burstTimer: 2.5,
+    fanTimer: rng.range(3.5, 4.5),
     hitFlash: 0,
     orbitDir: rng.chance(0.5) ? 1 : -1,
     orbitAngle: rng.angle(),
     seed: rng.range(0, Math.PI * 2),
+    age: 0,
+    // Stinger dash state: 'stalk' → 'tele' (telegraph) → 'dash' → 'recover'.
+    dashState: 'stalk',
+    dashTimer: 0,
+    dashX: 0,
+    dashY: 0,
   };
   return e;
+}
+
+// Where the player will be after `lead` seconds: enemies that aim or
+// chase at this point cut off an escape instead of trailing behind.
+function leadPoint(game, lead) {
+  const p = game.player;
+  return { x: p.x + p.vx * lead, y: p.y + p.vy * lead };
 }
 
 export function createParticle(x, y, color, speed, life, size) {
@@ -164,10 +178,28 @@ export function updateEnemy(game, e, dt) {
   const nx = dx / dist;
   const ny = dy / dist;
   if (e.hitFlash > 0) e.hitFlash -= dt;
+  e.age += dt;
 
   if (e.type === 'thorn') {
-    e.vx += nx * e.speed * 2.2 * dt;
-    e.vy += ny * e.speed * 2.2 * dt;
+    // Intercept course: chase where the player will be, not where they
+    // are, so kiting in a straight line no longer outruns the pack.
+    const lead = leadPoint(game, 0.25);
+    const lx = lead.x - e.x;
+    const ly = lead.y - e.y;
+    const ld = Math.hypot(lx, ly) || 1;
+    e.vx += (lx / ld) * e.speed * 2.2 * dt;
+    e.vy += (ly / ld) * e.speed * 2.2 * dt;
+    // Separation: thorns fan out instead of stacking into one blob.
+    for (const o of game.enemies) {
+      if (o === e || o.type !== 'thorn') continue;
+      const sx = e.x - o.x;
+      const sy = e.y - o.y;
+      const sd = Math.hypot(sx, sy);
+      if (sd > 0 && sd < 44) {
+        e.vx += (sx / sd) * 60 * dt;
+        e.vy += (sy / sd) * 60 * dt;
+      }
+    }
     clampSpeed(e, e.speed * 1.4);
   } else if (e.type === 'spitter') {
     // Keep its distance and spit orbs at the player.
@@ -181,7 +213,11 @@ export function updateEnemy(game, e, dt) {
     e.fireTimer -= dt;
     if (e.fireTimer <= 0 && p.alive && dist < 560) {
       e.fireTimer = 2.2;
-      game.ebullets.push(createEnemyBullet(e.x, e.y, Math.atan2(dy, dx)));
+      // Lead the shot: aim at where the player will be when the orb
+      // arrives, half-strength so a sharp turn still dodges it.
+      const flight = dist / CONFIG.EBULLET.speed;
+      const lead = leadPoint(game, flight * 0.5);
+      game.ebullets.push(createEnemyBullet(e.x, e.y, Math.atan2(lead.y - e.y, lead.x - e.x)));
       game.sound.tone(180, 0.12, 'square', 0.06, 120);
     }
   } else if (e.type === 'splitter') {
@@ -191,12 +227,60 @@ export function updateEnemy(game, e, dt) {
     e.angle += dt * 1.5;
   } else if (e.type === 'orbiter') {
     e.orbitAngle += e.orbitDir * 1.6 * dt;
-    const r = 210;
+    // The orbit tightens as the fight goes on: 210 down to 150 over
+    // 8 seconds, so orbiters close in instead of circling forever.
+    const r = 210 - Math.min(e.age, 8) * 7.5;
     const tx = p.x + Math.cos(e.orbitAngle) * r;
     const ty = p.y + Math.sin(e.orbitAngle) * r;
     e.vx += (tx - e.x) * 1.8 * dt;
     e.vy += (ty - e.y) * 1.8 * dt;
     clampSpeed(e, e.speed * 1.5);
+  } else if (e.type === 'stinger') {
+    // A dasher: stalks the player, telegraphs its lunge with a flash,
+    // then dashes at the spot the player stood at the dash's start.
+    e.dashTimer -= dt;
+    if (e.dashState === 'stalk') {
+      e.vx += nx * e.speed * 1.4 * dt;
+      e.vy += ny * e.speed * 1.4 * dt;
+      clampSpeed(e, e.speed);
+      if (dist < 340 && p.alive && e.dashTimer <= 0) {
+        e.dashState = 'tele';
+        e.dashTimer = 0.7;
+        e.vx *= 0.2;
+        e.vy *= 0.2;
+      }
+    } else if (e.dashState === 'tele') {
+      // Braked in place, flashing: the fair warning before the lunge.
+      e.vx *= Math.pow(0.05, dt);
+      e.vy *= Math.pow(0.05, dt);
+      e.hitFlash = 0.06;
+      if (e.dashTimer <= 0) {
+        e.dashState = 'dash';
+        e.dashTimer = 0.45;
+        const ddx = p.x - e.x;
+        const ddy = p.y - e.y;
+        const dd = Math.hypot(ddx, ddy) || 1;
+        e.dashX = ddx / dd;
+        e.dashY = ddy / dd;
+        game.sound.tone(320, 0.15, 'sawtooth', 0.05, 200);
+      }
+    } else if (e.dashState === 'dash') {
+      e.vx = e.dashX * 520;
+      e.vy = e.dashY * 520;
+      if (e.dashTimer <= 0) {
+        e.dashState = 'recover';
+        e.dashTimer = 1.4;
+      }
+    } else {
+      // Recover: drift slowly, then stalk again.
+      e.vx += nx * e.speed * 0.5 * dt;
+      e.vy += ny * e.speed * 0.5 * dt;
+      clampSpeed(e, e.speed * 0.5);
+      if (e.dashTimer <= 0) {
+        e.dashState = 'stalk';
+        e.dashTimer = 0;
+      }
+    }
   } else if (e.type === 'boss') {
     const enraged = e.hp < e.maxHp * 0.3;
     const sp = enraged ? e.speed * 1.7 : e.speed;
@@ -228,6 +312,19 @@ export function updateEnemy(game, e, dt) {
           game.wave, game.rng,
         ));
       }
+    }
+    // Aimed fan: three orbs at where the player is heading, so hiding
+    // behind the radial bursts' gaps is no longer a safe perch.
+    e.fanTimer -= dt;
+    if (e.fanTimer <= 0 && p.alive) {
+      e.fanTimer = enraged ? 3.5 : 4.5;
+      const flight = dist / CONFIG.EBULLET.speed;
+      const lead = leadPoint(game, flight * 0.5);
+      const base = Math.atan2(lead.y - e.y, lead.x - e.x);
+      for (const off of [-0.18, 0, 0.18]) {
+        game.ebullets.push(createEnemyBullet(e.x, e.y, base + off));
+      }
+      game.sound.tone(140, 0.15, 'square', 0.06, 100);
     }
   }
 
@@ -480,20 +577,39 @@ export function applyPickup(game, pk) {
     game.floaters.push(createFloater('SHIELD!', pk.x, pk.y, '#34d399'));
     game.sound.powerup();
   } else if (pk.kind === 'bomb') {
-    game.floaters.push(createFloater('NOVA BLAST!', pk.x, pk.y, '#fb7185'));
-    game.sound.bomb();
-    game.shake = 12;
-    // The nova wounds every enemy on screen and clears their bullets.
-    for (const e of game.enemies) {
-      e.hp -= 3;
-      e.hitFlash = 0.2;
-      if (e.hp <= 0) killEnemy(game, e);
+    // The nova is stored, not spent: one charge, detonated with B.
+    // A full charge is worth points instead of a wasted pickup.
+    if (game.nova < CONFIG.NOVA.maxCharges) {
+      game.nova += 1;
+      game.floaters.push(createFloater('NOVA READY — press B!', pk.x, pk.y, '#fb7185'));
+    } else {
+      game.score += 500;
+      game.floaters.push(createFloater('+500', pk.x, pk.y, '#fb7185'));
     }
-    game.enemies = game.enemies.filter((e) => e.hp > 0);
-    game.ebullets = [];
-    burst(game, p.x, p.y, '#fb7185', 40, 420);
+    game.sound.powerup();
   }
   burst(game, pk.x, pk.y, '#fbbf24', 8, 140);
+}
+
+// Detonate a stored nova: wounds every enemy on screen and clears
+// their bullets. Returns false when no charge is held.
+export function triggerNova(game) {
+  const p = game.player;
+  if (game.nova <= 0 || !p.alive) return false;
+  game.nova -= 1;
+  game.floaters.push(createFloater('NOVA BLAST!', p.x, p.y - 30, '#fb7185'));
+  game.sound.bomb();
+  game.shake = 12;
+  // The nova wounds every enemy on screen and clears their bullets.
+  for (const e of game.enemies) {
+    e.hp -= CONFIG.NOVA.damage;
+    e.hitFlash = 0.2;
+    if (e.hp <= 0) killEnemy(game, e);
+  }
+  game.enemies = game.enemies.filter((e) => e.hp > 0);
+  game.ebullets = [];
+  burst(game, p.x, p.y, '#fb7185', 40, 420);
+  return true;
 }
 
 export function burst(game, x, y, color, n, speed) {

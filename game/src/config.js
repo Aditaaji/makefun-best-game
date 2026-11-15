@@ -25,6 +25,7 @@ export const CONFIG = {
     spitter:  { radius: 18, hp: 2, speed: 70,  score: 150, color: '#c77dff' },
     splitter: { radius: 24, hp: 3, speed: 55,  score: 200, color: '#ff9e00' },
     orbiter:  { radius: 13, hp: 1, speed: 165, score: 120, color: '#4cc9f0' },
+    stinger:  { radius: 14, hp: 2, speed: 120, score: 250, color: '#f472b6' },
     boss:     { radius: 52, hp: 46, speed: 42,  score: 2000, color: '#ff2e63' },
   },
 
@@ -38,6 +39,11 @@ export const CONFIG = {
     rapidSeconds: 10,
     shieldSeconds: 15,
   },
+
+  // The nova blast: a bomb pickup stores one charge (press B to
+  // detonate). A stored charge is a choice — spend it on a swarm now,
+  // or save it for the Thornheart.
+  NOVA: { maxCharges: 1, damage: 3 },
 
   COMBO: {
     windowSeconds: 2.5,
@@ -70,16 +76,19 @@ export const CONFIG = {
 
 // Wave composition: which enemies appear in each wave.
 // Boss waves (3, 6, 10) add one Thornheart; wave 10 is the final boss.
+// Stingers (dashers) join from wave 3, one more every three waves.
 export function waveComposition(wave) {
   const comp = [];
   const thorns = 5 + wave * 2;
   const spitters = wave >= 2 ? 1 + Math.floor(wave / 2) : 0;
   const splitters = wave >= 3 ? Math.floor((wave - 1) / 2) : 0;
   const orbiters = wave >= 4 ? 2 + Math.floor(wave / 2) : 0;
+  const stingers = wave >= 3 ? 1 + Math.floor((wave - 3) / 3) : 0;
   for (let i = 0; i < thorns; i++) comp.push('thorn');
   for (let i = 0; i < spitters; i++) comp.push('spitter');
   for (let i = 0; i < splitters; i++) comp.push('splitter');
   for (let i = 0; i < orbiters; i++) comp.push('orbiter');
+  for (let i = 0; i < stingers; i++) comp.push('stinger');
   if (wave === 3 || wave === 6 || wave === 10) comp.push('boss');
   return comp;
 }
